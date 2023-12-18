@@ -1,0 +1,11 @@
+<div class="wrapper">
+  <video #videoRef controls></video>
+  <canvas #videoCanvasRef></canvas>
+  <canvas #canvasRef></canvas>
+</div>
+<input
+  type="file"
+  accept="video/*"
+  capture="environment"
+  (change)="onVideoUpload($event)"
+/>

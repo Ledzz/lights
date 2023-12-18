@@ -1,0 +1,5 @@
+@for (item of scan$ | async; track item.ssid) {
+  <button (click)="select(item)">{{ item.ssid }}</button>
+} @empty {
+  There are no items.
+}
