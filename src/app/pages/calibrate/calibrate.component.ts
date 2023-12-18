@@ -11,6 +11,8 @@ import {
   CalibrationPoint,
   CalibrationSpot,
 } from '../../types/effect';
+import { WsService } from '../../services/ws.service';
+import { environment } from '../../../environments/environment';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -74,7 +76,6 @@ function visualizeBrightestSpot(
     );
   }
 }
-const NUM_PIXELS = 9;
 const FRAME_DELAY = 0.1;
 @Component({
   selector: 'app-calibrate',
@@ -101,10 +102,20 @@ export class CalibrateComponent implements OnInit {
   videoCanvasContext!: CanvasRenderingContext2D;
 
   scanService = inject(ScanService);
+  private wsService = inject(WsService);
   ngOnInit() {
     this.canvasContext = this.canvas.nativeElement.getContext('2d')!;
     this.videoCanvasContext =
       this.videoCanvasElement.nativeElement.getContext('2d')!;
+
+    // setTimeout(() => {
+    //   // test
+    //   const values = Array(environment.ledsCount)
+    //     .fill(null)
+    //     .map((_, k) => 'ff0000');
+    //   this.wsService.setBrightness(5);
+    //   this.wsService.sendColors(values);
+    // }, 500);
   }
 
   onVideoUpload(ev: Event) {
@@ -123,56 +134,61 @@ export class CalibrateComponent implements OnInit {
 
     this.videoElement.nativeElement.addEventListener(
       'canplay',
-      async () => {
-        // Set canvases size
-        const width = this.videoElement.nativeElement.videoWidth;
-        const height = this.videoElement.nativeElement.videoHeight;
-
-        this.canvas.nativeElement.width =
-          this.videoCanvasElement.nativeElement.width = width!;
-        this.canvas.nativeElement.height =
-          this.videoCanvasElement.nativeElement.height = height!;
-
-        const allOff = 2.5;
-        const first = 2.66;
-
-        const allOffData = applyCurve(await this.getVideoData(allOff));
-        const spots: CalibrationData = [];
-
-        for (let i = 0; i < NUM_PIXELS; i++) {
-          const data = applyCurve(
-            await this.getVideoData(first + i * FRAME_DELAY),
-          );
-          const diff = this.getDiff(allOffData, data);
-          const spot = findBrightestSpot(diff, 200);
-          if (spot) {
-            spots.push({ index: i, x: spot.x / width, y: spot.y / height });
-          }
-
-          // this.canvasContext.putImageData(diff, 0, 0);
-          // visualizeBrightestSpot(this.canvasContext, spot);
-          // await wait(500);
-        }
-        console.log(spots);
-
-        // const allWhitesData = applyCurve(await this.getVideoData(allWhites));
-        // const allOffData = applyCurve(await this.getVideoData(allOff));
-        // const d1 = applyCurve(await this.getVideoData(d1t));
-        // const diff = this.getDiff(allOffData, d3);
-        // this.canvasContext.putImageData(diff, 0, 0);
-
-        // Set the threshold value for bright spots (adjust as needed)
-        // const threshold = 240;
-        //
-        // // Find bright spots in the image with aspect ratio close to 1
-        // const brightSpots = await findCircularBrightSpots(diff, threshold);
-        // console.log(brightSpots);
-        // // Visualize the filtered bright spots on the canvas
-        // visualizeCircularBrightSpots(this.canvasContext, diff, brightSpots);
-      },
+      this.analyzeVideo,
       { once: true },
     );
   }
+
+  analyzeVideo = async () => {
+    // processor = new MediaStreamTrackProcessor(track);
+    //
+    // const frameReader = processor.readable.getReader();
+
+    //return;
+    // Set canvases size
+    const width = this.videoElement.nativeElement.videoWidth;
+    const height = this.videoElement.nativeElement.videoHeight;
+
+    this.canvas.nativeElement.width =
+      this.videoCanvasElement.nativeElement.width = width!;
+    this.canvas.nativeElement.height =
+      this.videoCanvasElement.nativeElement.height = height!;
+
+    const allOff = 2.5;
+    const first = 2.66;
+
+    const allOffData = applyCurve(await this.getVideoData(allOff));
+    const spots: CalibrationData = [];
+
+    for (let i = 0; i < environment.ledsCount; i++) {
+      const data = applyCurve(await this.getVideoData(first + i * FRAME_DELAY));
+      const diff = this.getDiff(allOffData, data);
+      const spot = findBrightestSpot(diff, 200);
+      if (spot) {
+        spots.push({ index: i, x: spot.x / width, y: spot.y / height });
+      }
+
+      // this.canvasContext.putImageData(diff, 0, 0);
+      // visualizeBrightestSpot(this.canvasContext, spot);
+      // await wait(500);
+    }
+    console.log(spots);
+
+    // const allWhitesData = applyCurve(await this.getVideoData(allWhites));
+    // const allOffData = applyCurve(await this.getVideoData(allOff));
+    // const d1 = applyCurve(await this.getVideoData(d1t));
+    // const diff = this.getDiff(allOffData, d3);
+    // this.canvasContext.putImageData(diff, 0, 0);
+
+    // Set the threshold value for bright spots (adjust as needed)
+    // const threshold = 240;
+    //
+    // // Find bright spots in the image with aspect ratio close to 1
+    // const brightSpots = await findCircularBrightSpots(diff, threshold);
+    // console.log(brightSpots);
+    // // Visualize the filtered bright spots on the canvas
+    // visualizeCircularBrightSpots(this.canvasContext, diff, brightSpots);
+  };
 
   async getVideoData(time: number) {
     return new Promise<ImageData>((resolve) => {
@@ -215,5 +231,25 @@ export class CalibrateComponent implements OnInit {
       diff.data[i + 3] = 255;
     }
     return diff;
+  }
+
+  async calibrateSequence() {
+    this.wsService.setBrightness(5);
+
+    this.wsService.sendColor('ffffff');
+
+    await wait(5000);
+    this.wsService.sendColor('000000');
+
+    await wait(500);
+
+    // Could use divisions by 3 to get faster results
+    for (let i = 0; i < environment.ledsCount; i++) {
+      const values = Array(environment.ledsCount)
+        .fill(null)
+        .map((_, k) => (k === i ? 'ffffff' : '000000'));
+      this.wsService.sendColors(values);
+      await wait(500);
+    }
   }
 }

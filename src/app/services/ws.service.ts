@@ -9,8 +9,20 @@ export class WsService {
   subject = webSocket(environment.ws);
 
   connection = this.subject.subscribe();
-  send(colors: string[]) {
+  sendColors(colors: string[]) {
     this.subject.next({ seg: { i: [0, ...colors] } });
+  }
+
+  sendColor(color: string) {
+    const values = Array(environment.ledsCount)
+      .fill(null)
+      .map((_, k) => 'ffffff');
+
+    this.sendColors(values);
+  }
+
+  setBrightness(brightness: number) {
+    this.subject.next({ bri: brightness });
   }
 
   ngOnDestroy() {

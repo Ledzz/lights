@@ -1,10 +1,9 @@
-import { Component, ElementRef, inject, ViewChild } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CalibrationData, Effect, EffectData, Frame } from '../../types/effect';
 import { ScanService } from '../../services/scan.service';
 import { Effects } from '../../effects';
 import { WsService } from '../../services/ws.service';
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import { wait } from '../../utils/wait';
 
 const TMP_DATA: CalibrationData = [
   {
@@ -94,7 +93,7 @@ export class EffectsComponent {
 
     for (const frame of frames.frames) {
       const colors = frame.map(([i, r, g, b]) => toHex(r, g, b));
-      this.wsService.send(colors);
+      this.wsService.sendColors(colors);
       await wait(effect.delay);
     }
   }
